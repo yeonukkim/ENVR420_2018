@@ -16,11 +16,14 @@ rm(list = ls())
 ls()
 getwd()
 
+# Load package
+library(lubridate) #load the package "lubridate" - make sure that it is installed on your computer 
+library(tidyverse) #load the package "tidyverse" - make sure that it is installed on your computer
+
 # Load the file containing data
 CO2.all <- read.csv("https://raw.githubusercontent.com/yeonukkim/ENVR420_2018/master/ENVR_420_18_co2f.csv")
 
 # fix date string
-library(lubridate) #load the package "lubridate" - make sure that it is installed on your computer 
 class(CO2.all$Date) #check which class variable "Date" is
 CO2.all$Date <- as.Date(CO2.all$Date,"%Y-%m-%d") #convert variable "Date" into class "Date"
 class(CO2.all$Date) #check which class variable "Date" is now
@@ -31,35 +34,41 @@ class(CO2.all$date.time) #check which class variable "date.time" is
 CO2.all$date.time <- ymd_hms(CO2.all$date.time) 
 class(CO2.all$date.time) #check which class variable "date.time" is now
 
+# change location and sampe class to factor
+# factor class is useful for grouping the dataset.
+class(CO2.all$sample) #this one looks integer
+class(CO2.all$Location) # this one looks factor
+CO2.all$sample <- as.factor(CO2.all$sample)
+summary(CO2.all$sample) 
+summary(CO2.all$Location)
+
+
 # Plot data for initial examination
-plot(CO2.all$date.time,CO2.all$CO2.ppm.cal) # slopes for CO2
-plot(CO2.all$date.time,CO2.all$RH.pct)      # slopes of relative humidity
+ggplot(CO2.all, aes(x = date.time, y = CO2.ppm.cal, colour = Location)) + geom_point() # slopes for CO2
+ggplot(CO2.all, aes(x = date.time, y = RH.pct, colour = Location)) + geom_point() # rh
+ggplot(CO2.all, aes(x = date.time, y = chamber.temp.degC, colour = Location)) + geom_point() # chamber
+ggplot(CO2.all, aes(x = date.time, y = CO2.ppm.cal, colour = sample)) + geom_point() + facet_wrap(~Location)
 
-# Select start point of slope calculations, and create index for loop
-# Create an index of start times identifying slopes
-plot(CO2.all$date.time,CO2.all$CO2.ppm.cal)
-slope_start_ind <- identify(CO2.all$date.time,CO2.all$CO2.ppm.cal) # identify points manually then press finish on plot
 
-# ** You have to press ESC to end the slope selection process **
 
 ##################### basic linear flux calculation output micromole per m2 per second 
-Pbar_tmp <- 101;  # kPa
-Pbar <- Pbar_tmp * 1000; # Pa
+### function to calculate co2 flux (regression method)
 
-Vol  <- 0.0014;  # volume of chamber (in m3)
-Sur  <- 0.0079;  # surface area of chamber (in m2)
-R <- 8.3144; # Universal Gas Constant in J mol-1 K-1 (or J Kg-1 K-1)
+co2flux <- function(co2,airT,rH){
 
-# calculate fluxes (regression method)
-nbr_sample <- length(slope_start_ind)
-
-for (i in 1:nbr_sample){
-	#############################################################################start of loop
-	ind <- slope_start_ind[i]  # ind = individual slope
-	ind2 <- ind+50
-	CO2_tmp <- CO2.all$CO2.ppm.cal[ind:ind2]
-	Air_T_tmp <- 23;
-	H2O_tmp <- CO2.all$RH.pct[ind:ind2]  # relative humidity (%)
+	# only use First 50 seconds
+	CO2_tmp <- co2[1:50]
+	Air_T_tmp <- mean(airT[1:50]);
+	H2O_tmp <- rH[1:50] # relative humidity (%)
+	
+	
+	# define parameters
+	Pbar_tmp <- 101;  # kPa
+	Pbar <- Pbar_tmp * 1000; # Pa
+	Vol  <- 0.0014;  # volume of chamber (in m3)
+	Sur  <- 0.0079;  # surface area of chamber (in m2)
+	R <- 8.3144; # Universal Gas Constant in J mol-1 K-1 (or J Kg-1 K-1)
+	
 	
 	# convert to mixing ratios
 	H2O_p <- H2O_tmp*(0.61365*exp((17.502*Air_T_tmp)/(240.97+Air_T_tmp)))/100 #kPa
@@ -67,6 +76,7 @@ for (i in 1:nbr_sample){
 	H2O_mix_ratio <- H2O_mole_fraction/(1-H2O_mole_fraction) #mol H2O/mol dry air
 	
 	CO2_mix_ratio <- CO2_tmp/(1-H2O_mole_fraction) 
+	
 	
 	#creating x to be time in seconds
 	time_s <- 1:length(CO2_tmp)
@@ -79,22 +89,22 @@ for (i in 1:nbr_sample){
 	
 	rho <- Pbar/ (R * (Air_T_tmp + 273.15));  # mol/m3 ( P is in Pa)
 	
-	F[i] <- rho * Vol / Sur * dcdt_tmp/(1 + mean(H2O_mix_ratio));
+	co2flux <- rho * Vol / Sur * dcdt_tmp/(1 + mean(H2O_mix_ratio));
 	
+	return(co2flux)
 }
-#################################################################################End of loop
 
-plot(F) #this just displays the calculated fluxs 
 
-CO2.exp <- as.data.frame(F)
-CO2.exp$Reading.number <- c(1:9) # assign the "Reading number" to the data.frame
-CO2.exp$Treatment <- c(rep("green.grass",3),rep("brown.grass",3),rep("meadow",3)) #populate the variable "Treatment"
-CO2.exp <- CO2.exp[,c(2,1,3)] #rearrange data.frame columns
-names(CO2.exp) <- c("Reading.number","soil.flux","Treatment")
+# apply the fuction to the dataset
 #soil.flux is the soil respiration in micromol CO2 per square meter per second
+result <- CO2.all %>% 
+							group_by(sample, Location) %>%
+							summarise(soil.flux = co2flux(CO2.ppm.cal,chamber.temp.degC,RH.pct))
 
-CO2.exp
-boxplot(soil.flux ~ Treatment, data = CO2.exp)
+result
+boxplot(soil.flux ~ Location, data = result)
+
+
 
 # For comparing the four treatments, be sure to use ANOVA and Tukey HSD as we did in the first lab
 # If you want to do a t-test, first need to do a subset to create a data.frame with only two treatments
