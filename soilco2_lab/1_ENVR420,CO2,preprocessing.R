@@ -99,7 +99,7 @@ full$Location <- ifelse(full$sample %in% c(1,2,6),"grass.bare",
 
 full <- full[,-3]
 
-write_csv(full,"ENVR_420_18_co2f.csv")
+write_csv(full,"./soilco2_lab/ENVR_420_18_co2f.csv")
 
 
 

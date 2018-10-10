@@ -11,9 +11,8 @@
 # Step 4: Calculate fluxes
 #     -- Select and run lines 44:90
 
-#Clear memory, confirm working directory
+#confirm working directory
 rm(list = ls())
-ls()
 getwd()
 
 # Load package
