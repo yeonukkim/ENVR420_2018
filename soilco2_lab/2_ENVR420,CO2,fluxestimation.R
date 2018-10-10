@@ -45,11 +45,10 @@ summary(CO2.all$Location)
 
 # Plot data for initial examination
 ggplot(CO2.all, aes(x = date.time, y = CO2.ppm.cal, colour = Location)) + geom_point() # slopes for CO2
-ggplot(CO2.all, aes(x = date.time, y = RH.pct, colour = Location)) + geom_point() # rh
-ggplot(CO2.all, aes(x = date.time, y = chamber.temp.degC, colour = Location)) + geom_point() # chamber
 ggplot(CO2.all, aes(x = date.time, y = CO2.ppm.cal, colour = sample)) + geom_point() + facet_wrap(~Location)
 
-
+ggplot(CO2.all, aes(x = date.time, y = RH.pct, colour = Location)) + geom_point() # rh
+ggplot(CO2.all, aes(x = date.time, y = chamber.temp.degC, colour = Location)) + geom_point() # chamber
 
 ##################### basic linear flux calculation output micromole per m2 per second 
 ### function to calculate co2 flux (regression method)
