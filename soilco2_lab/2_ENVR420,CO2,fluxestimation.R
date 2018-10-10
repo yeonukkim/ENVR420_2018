@@ -37,6 +37,7 @@ class(CO2.all$date.time) #check which class variable "date.time" is now
 # factor class is useful for grouping the dataset.
 class(CO2.all$sample) #this one looks integer
 class(CO2.all$Location) # this one looks factor
+class(CO2.all$system)
 CO2.all$sample <- as.factor(CO2.all$sample)
 summary(CO2.all$sample) 
 summary(CO2.all$Location)
@@ -46,8 +47,9 @@ summary(CO2.all$Location)
 ggplot(CO2.all, aes(x = date.time, y = CO2.ppm.cal, colour = Location)) + geom_point() # slopes for CO2
 ggplot(CO2.all, aes(x = date.time, y = CO2.ppm.cal, colour = sample)) + geom_point() + facet_wrap(~Location)
 
-ggplot(CO2.all, aes(x = date.time, y = RH.pct, colour = Location)) + geom_point() # rh
-ggplot(CO2.all, aes(x = date.time, y = chamber.temp.degC, colour = Location)) + geom_point() # chamber
+ggplot(CO2.all, aes(x = date.time, y = CO2.ppm.cal, colour = system)) + geom_point()
+ggplot(CO2.all, aes(x = date.time, y = RH.pct, colour = system)) + geom_point() # rh
+ggplot(CO2.all, aes(x = date.time, y = chamber.temp.degC, colour = system)) + geom_point() # chamber
 
 ##################### basic linear flux calculation output micromole per m2 per second 
 ### function to calculate co2 flux (regression method)
