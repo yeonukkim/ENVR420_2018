@@ -87,15 +87,14 @@ plot(full$CO2.ppm.cal)
 plot(full$RH.pct)
 
 #sameple location
-location <- c("grass.bare","grass.bare","grass.live","grass.live","grass.live","grass.bare",
-							"meadow","meadow","meadow","raised.bed","raised.bed","raised.bed")
-
 full$Location <- ifelse(full$sample %in% c(1,2,6),"grass.bare",
 												ifelse(full$sample %in% c(3,4,5),"grass.live",
 															 ifelse(full$sample %in% c(7,8,9),"meadow","raised.bed"
 															 			 )
 															 )
 												)
+
+full <- full[,-3]
 
 write_csv(full,"ENVR_420_18_co2f.csv")
 
