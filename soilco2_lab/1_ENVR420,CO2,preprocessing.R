@@ -9,8 +9,8 @@ library(tidyverse)
 library(chron)
 
 # Load the original data file
-system1 <- read.csv("https://raw.githubusercontent.com/yeonukkim/ENVR420_2018/master/ENVR420_18_system1.csv", header = FALSE)
-system2 <- read.csv("https://raw.githubusercontent.com/yeonukkim/ENVR420_2018/master/ENVR420_18_system2.csv", header = FALSE)
+system1 <- read.csv("https://raw.githubusercontent.com/yeonukkim/ENVR420_2018/master/soilco2_lab/raw_system1.csv", header = FALSE)
+system2 <- read.csv("https://raw.githubusercontent.com/yeonukkim/ENVR420_2018/master/soilco2_lab/raw_system2.csv", header = FALSE)
 
 system1 <- system1[,-c(1,13,14)]
 system2 <- system2[,-c(1,13,14)]

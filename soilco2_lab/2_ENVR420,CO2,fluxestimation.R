@@ -21,7 +21,7 @@ library(lubridate) #load the package "lubridate" - make sure that it is installe
 library(tidyverse) #load the package "tidyverse" - make sure that it is installed on your computer
 
 # Load the file containing data
-CO2.all <- read.csv("https://raw.githubusercontent.com/yeonukkim/ENVR420_2018/master/ENVR_420_18_co2f.csv")
+CO2.all <- read.csv("https://raw.githubusercontent.com/yeonukkim/ENVR420_2018/master/soilco2_lab/ENVR_420_18_co2f.csv")
 
 # fix date string
 class(CO2.all$Date) #check which class variable "Date" is
