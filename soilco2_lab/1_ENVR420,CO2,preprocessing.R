@@ -80,6 +80,9 @@ result2$sample <- c(rep(0,slope_start_ind2[1]-1),
 										rep(0,abs(slope_end_ind2[6]-nrow(result2))+1)
 )
 
+result1$system <- "system1"
+result2$system <- "system2"
+
 full <- rbind(result1,result2)
 full <- full[-which(full$sample == 0),]
 
