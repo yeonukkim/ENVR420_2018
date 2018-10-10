@@ -88,9 +88,9 @@ co2flux <- function(co2,airT,rH){
 	
 	rho <- Pbar/ (R * (Air_T_tmp + 273.15));  # mol/m3 ( P is in Pa)
 	
-	co2flux <- rho * Vol / Sur * dcdt_tmp/(1 + mean(H2O_mix_ratio));
+	flux <- rho * Vol / Sur * dcdt_tmp/(1 + mean(H2O_mix_ratio));
 	
-	return(co2flux)
+	return(flux)
 }
 
 
