@@ -1,0 +1,150 @@
+---
+title: "ENVR 420 water quality lab"
+output: html_notebook
+---
+
+Water samples were collected from two sites, sampling three locations for each site Four replicates samples were obtained for each sample location (2 sites X 3 locations X 4 replicates + 1 additional sample due to student numbers = 25 samples total). Each sample was analyzed three times, resulting in 75 readings for each parameter (Dissolved organic carbon (DOC), in mg/L, and nitrate (NO3-) in mg/L). 
+
+Analytical steps are separated below into chunks.
+
+# 1. Read in results data
+This is typically done using `read.table` or `read.csv` to load a file from your computer or from the web.
+- Here, data was posted as a comma delimited text file (.csv)
+
+```{r}
+wq <- read.csv("http://ecohydro.ires.ubc.ca/pdfs/ENVR420_2018_WQ_Data.csv")
+```
+
+
+# 2. Explore data structure and classes
+ - Use `head` and `str` to have a look at how the data is structured, ensuring that it imported properly
+ - Below the column names (i.e. variables) you will find information on the "classes" of the data as it was imported. 
+ - Are things coded as expected (factors (i.e. categorical), date/time, and numerical variables)?
+ int = integer (i.e. a whole number);  fctr = factor (i.e. categorical variable);  dbl = double ("double precision floating point numbers"), see http://uc-r.github.io/integer_double/ 
+ 
+ - Note - the `head()` function on in the Console will not indicate the classes for variables within data.frames, though output using an R Notebook will. Regardless, the `str()` function will indicate the class for each variable in the data.frame. The class "double" will display as "num" (numeric) with the `str()` function.
+
+```{r}
+head(wq)
+str(wq)
+```
+
+# 3. Checkout the overall `data.frame` using `summary()`
+this will give a summary of each variable in the `data.frame`
+- things to look for: 
+-- Any variables with `NA`? These can cause issues for some functions later, and are good to be aware of at this point. We will deal with missing data in a subsequent lab. 
+
+```{r}
+summary(wq)
+```
+
+
+`Site` is a variable within the data.frame `wq`; written as: `wq$Site`.  `wq$Site` is a factor variable, e.g. it has levels or descriptors rather than being a numerical variable
+```{r}
+?class
+class(wq$Site)
+summary(wq$Site)
+```
+
+
+# 4. Let's start to manipulate the data to faciliate comparisions. 
+
+For example, you can create new `data.frame` objects by using `subset` on a `data.frame`. Here, we will subset the data into each site that you sampled (e.g. the Biodiversity BioSwale/Greenroof, and another subset from the University Boulevard water feature):
+
+```{r}
+bd <- subset(wq, Site == "GreenRoof") # Note - The GreenRoof site at the Biodiversity Centre is abbreviated bd
+ub <- subset(wq, Site == "UniBlvd") # Note - University Blvd site is abbreviated as ub
+
+class(bd$Position)
+summary(bd$Position)
+```
+
+
+Let's look at the data for one of the new data.frames that was subset from the whole data.frame, first the Biodiversity site. Also check out the data for just one variable 
+```{r}
+summary(bd)
+summary(bd$DOC_mg_L)
+```
+
+
+Note that the data above includes all sampling positions. Now look at the data for the university blvd site. 
+```{r}
+summary(ub)
+summary(ub$DOC_mg_L)
+```
+
+
+# 5. How about visualizing the data? Exploratory plots such as `boxplot`
+```{r}
+?boxplot
+boxplot(DOC_mg_L ~ Position, data = bd, main = "Biodiversity") # main puts the title on a plot using base R
+boxplot(DOC_mg_L ~ Position, data = ub, main = "University Blvd") 
+```
+
+
+# 6. Do some statistical analyses. Key functions: `t.test`, `aov`, and `TukeyHSD`.  
+First, we will do a T-test to compare two positions within one site. 
+
+Do do this, we will initially create new data.frames to facilitate comparison. Try this using `subset`. 
+```{r}
+bd.upper <- subset(bd, Position == "upper")
+bd.middle <- subset(bd, Position == "middle")
+```
+
+Note that T-tests are used to compare only two groups. Note that `t.test` defaults to a two sided comparison (e.g. the difference between the groups can be either greater or less to satisfy the test).
+```{r}
+?t.test
+t.test(bd.upper$DOC_mg_L, bd.middle$DOC_mg_L)
+```
+
+
+6.1 How can we determine if a parameter differs by position within a site when there are more than 2 positions? 
+- must use ANOVA since more than 2 Positions. In R, the function for ANOVA is `aov`. It can inform if there are statistical differences within the Site (e.g. if DOC at "Positions" are statistically different)
+```{r}
+?aov
+DOC.aov.bd <- aov(DOC_mg_L ~ Position, data = bd) 
+summary(DOC.aov.bd)
+
+```
+
+OK, so we a very strong indication that DOC varies by position within the Biodiversity GreenRoof site. But, how to make multiple comparisons? Try `TukeyHSD`. Note that `TukeyHSD` is a fairly conservative test because it incorporates the variance from the entire group (here, three Positions) when comparing pairs of factors. 
+Also note that in `R` the `TukeyHSD` function can be run only on the output from another process, such as `aov`. 
+```{r}
+?TukeyHSD
+TukeyHSD(DOC.aov.bd) # Here, DOC.aov.db is the stored output from the ANOVA test run above
+```
+
+# 7. You can normalize variables within a data.frame, which can be useful. 
+For example, the carbon to nitrogen ratio (C/N) is often used as a proxy to describe the bio-availability of carbon, where wood with C/N of 300 is less available for decomposition (e.g. less bio-available and more recalcitrant) compared to a a leaf with a C/N ratio of 50. 
+
+-- Here, a simple function will be applied to each row of the dataframe.  We will call this CN_ratio_proxy since it is not the true C:N ratio since there are other forms of N in the water which were not analyzed. 
+```{r}
+head(wq)
+wq$CN_ratio_proxy <- wq$DOC_mg_L / wq$NO3_mg_L # divide DOC_mg_L by NO3_mg_L for each row (e.g. for each replicate).
+
+head(wq)
+```
+# 8. Note that the new variable `CN_ratio_proxy` was applied to the original data.frame `wq` and so did not propagate to any subsets (new data.frames) that were created prior to creating `CN_ratio_proxy`. 
+
+# 9. For reporting, it is good to be report mean values and standard deviations. 
+Compute `mean` and `sd` for one parameter at a single position [note - this is not the most elegant way but is useful for learning/understanding R]
+```{r}
+mean(subset(bd,Position=="upper")$DOC_mg_L)
+sd(subset(bd,Position=="upper")$DOC_mg_L)
+```
+
+
+
+# Assignment:
+## Explore the water quality results determined from the samples collected.
+
+## Use creative comparisons and critical thinking!
+
+## Please submit a document with: 
+1. Brief description of the experiment/lab
+2. A summary table of results indicating mean ± sd for each sample location for each parameter (DOC and NO3-)
+3. Three testable hypotheses that can be explored using the data available. 
+4. Evaluation of your hypotheses, expressed in words and with statistical test results (e.g. p-values)
+5. *Submit a separate file* with your `R` code. This can be a .R file (R Script) or a .Rmd file (R Notebook). 
+
+-Optional stretching goal: Can you output a table with your results? Note that we have only discussed base `R` to this point, but will be using additional packages in later weeks, some of which are very helpful for data wrangling and synthesis. 
