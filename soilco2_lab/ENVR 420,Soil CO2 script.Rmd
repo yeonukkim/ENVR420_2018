@@ -1,0 +1,313 @@
+---
+title: "Soil CO2 lab"
+output: html_notebook
+---
+
+#A note on the files and assignment
+This R Markdown document consists of 3 chunks of code. Each of these chuncks is also posted as separate .R scripts that can be run line-by-line.  
+-The first chunk imports and processes the raw data from the two soil CO2 respiration systems. 
+--Chunck 1 is found in the .R file "ENVR 420,Soil CO2 script,Part1.R".
+--Note that you will need to work with the code in "ENVR 420,Soil CO2 script,Part1.R" to answer questions 1-3
+
+-The second chunk is where slopes corresponding to the linear phases of the measurement periods are identified, selected, and exported for further processing. This iterative piece is combersome in R Markdown, but works well as an R script. Both versions are provided. 
+--Chunk 2 is found also found in the .R file "ENVR 420,Soil CO2 script,Part2.R"
+--Note that chunk 2 and associated .R file is provided, but engagement with it is not required to complete the problem set/assignment. 
+
+-The third chunk is where the fluxes are calculated (it first re-imports the slopes that were wrangled in the second chunk).
+--Chunk 3 is found at "ENVR 420,Soil CO2 script,Part3.R"
+--The results from the experiment are tablulated for you in Chunk 3 and "ENVR 420,Soil CO2 script,Part3.R". You will need to engage with the data.frame found at the end of that chunk or file in order to complete the problem set/assignment. You should be able to adapt code from your previous problem set (water quality) in order to provide statistical tests to evaluate your hypotheses. These can be performed on the data.frame that is generated at the end of Chunk 3 and "ENVR 420,Soil CO2 script,Part3.R". That is, you don't have to modify any of the code to complete the assignment, but you will need to work with the results. 
+
+#Details on experiental set-up
+Recall that the systems consisted of the chambers (placed on the soil), the infrared gas analyzer (IRGA), a pump circulating air through the IRGA and chamber, a data logger, plus other minor components. Details on the IRGA can be found at: https://www.licor.com/env/products/gas_analysis/LI-840A/. The soil sensor (METER sensor model GS-3) has details at http://library.metergroup.com/Manuals/20429_GS3_Web.pdf. 
+
+Recorded data has the following columns:
+"Year" = year
+"DoY"= day of year (i.e. Julian day)
+"HHMM" = time in hours and minutes
+"SS" = time in seconds
+"BattVolt.V" = battery voltage (in V)
+"CO2.mV" = CO2 signal in the IRGA output as mV (proportional to ppm)
+"CO2.ppm" = CO2 concentration in the IRGA converted to ppm from mV by the data logger program based on the zero point and span (see IRGA CO2 calibration info below)
+"CO2.ppm.cal" = CO2 concentration after adjusting for calibration parameters determined in the lab and programmed into the data logger
+"system.temp" = system temperature (in deg C)
+"RH.pct" = relative humidity, in percent, where 100 = saturated air for the temperature of the chamber
+"chamber.temp.degC" = chamber temperature (in deg C)
+
+IRGA CO2 calibration info: [used for some questions posed at end of the lab]
+Definitions: 
+zero point: the output reading when the input has a value of zero. Here, for an input gas with 0 ppm CO2 (e.g. pure N2)
+span: the output reading when the input value has the maximum reading for the system. Here, the IRGA can read up to 1000 ppm, so it has a span of 0 ppm to 1000 ppm = 1000 ppm 
+System output values: 
+[0 mV = 0 ppm]; [5000 mV = 1000 ppm] (these are set by the IRGA system)
+-- think of X = known values (here, what the data logger receives as a mV signal); Y = unknown values (here, what the data logger computes based on the known values)
+
+# 1. Preprocessing of recorded data
+```{r preprocessing CO2 chamber data}
+# getwd() will report the working directory, which will be where output is stored
+getwd()
+
+# load library
+library(tidyverse)
+library(chron) # if you get an error like "Error in library(chron) : there is no package called ‘chron’", be sure to install the package and try again
+
+# Load the original data files
+system1 <- read.csv("https://raw.githubusercontent.com/yeonukkim/ENVR420_2018/master/soilco2_lab/raw_system1.csv", header = FALSE)
+system2 <- read.csv("https://raw.githubusercontent.com/yeonukkim/ENVR420_2018/master/soilco2_lab/raw_system2.csv", header = FALSE)
+
+system1 <- system1[,-c(1,13,14)] # this retains all rows, but removes columns 1, 13 and 14 which were not needed
+system2 <- system2[,-c(1,13,14)]
+
+# col name 
+head <- c("Year","DoY", "HHMM", "SS", "BattVolt.V", "CO2.mV", "CO2.ppm", "CO2.ppm.cal", "system.temp", "RH.pct", "chamber.temp.degC")
+colnames(system1) <- head
+colnames(system2) <- head
+
+#make datetime col
+system1$DoY <- as.numeric(system1$DoY)
+system2$DoY <- as.numeric(system2$DoY)
+system1$SS <- round(system1$SS)
+system2$SS <- round(system2$SS)
+
+Date <- as.Date(system1$DoY, origin = "2018-01-01")
+date.time <- strptime(paste0(substr(as.character(system1$HHMM),1,2),":",substr(as.character(system1$HHMM),3,4),":",as.character(system1$SS)), "%H:%M:%S")
+Time <- times(format(date.time, "%H:%M:%S"))
+
+result1 <- cbind(Date,Time,date.time, system1[,-c(1:4)])
+
+Date <- as.Date(system2$DoY, origin = "2018-01-01")
+date.time <- strptime(paste0(substr(as.character(system2$HHMM),1,2),":",substr(as.character(system2$HHMM),3,4),":",as.character(system2$SS)), "%H:%M:%S")
+Time <- times(format(date.time, "%H:%M:%S"))
+
+result2 <- cbind(Date,Time,date.time, system2[,-c(1:4)])
+
+# We can determine the data logger conversion equations (CO2.mV to CO2.ppm and CO2.ppm.cal) based on the recorded data. 
+# CO2.mV is the raw signal out of the IRGA as recorded by the data loger
+# CO2.ppm is the conversion to the uncalibrated CO2 value
+# CO2.ppm.cal is the calibrated value for CO2 based on mV output and calibration values determined previously in the lab 
+head(system1)
+plot(system1$CO2.mV,system1$CO2.ppm)
+rawCal_system1 <- lm(CO2.ppm ~ CO2.mV,data = system1)
+summary(rawCal_system1)
+rawCal_system1$coefficients # Note - the first coefficient is the intercept (beta0) and the second coefficient is the slope (beta1)
+
+plot(system2$CO2.mV,system2$CO2.ppm)
+
+```
+
+# 2. Identification of measurement periods and slope selections
+This chunk will select start and end points of slope calculations by interactive selection of start/end times identifying slopes and storing selected points in variables to be used later. 
+```{r identification of measurements within CO2 chamber data}
+
+# Select start and end points of slope calculations
+# Create an index of start times identifying slopes
+
+# System 1 -- first plot the data
+plot(result1$date.time,result1$CO2.ppm.cal)
+#** Identify (click on) the start of the linear phase for the six measurements (e.g. in the plot window), then press "Finish" or "esc"
+
+## *** PLEASE NOTE that the function identify() below will only work if you execute the "plot" command above from the command line
+slope_start_ind1 <- identify(result1$date.time,result1$CO2.ppm.cal) 
+slope_start_ind1 
+# This provides the index of the row in the data.frame where the flux calculation should start
+
+# Then, identify (click) END of the linear phase for the six slopes, again pressing "Finish" or "esc"
+plot(result1$date.time,result1$CO2.ppm.cal)
+## *** PLEASE NOTE that the function identify() below will only work if you execute the "plot" command above from the command line
+slope_end_ind1 <- identify(result1$date.time,result1$CO2.ppm.cal)
+slope_end_ind1 
+# This provides the index of the row in the data.frame where the flux calculation should end
+
+# make "sample"" col and remove data don't need. (here, "sample" = the individual flux measurement)
+result1$sample <- c(rep(0,slope_start_ind1[1]-1),
+                    rep(1,abs(slope_start_ind1[1]-slope_end_ind1[1])),
+                    rep(0,abs(slope_end_ind1[1]-slope_start_ind1[2])),
+                    rep(2,abs(slope_start_ind1[2]-slope_end_ind1[2])),
+                    rep(0,abs(slope_end_ind1[2]-slope_start_ind1[3])),
+                    rep(3,abs(slope_start_ind1[3]-slope_end_ind1[3])),
+                    rep(0,abs(slope_end_ind1[3]-slope_start_ind1[4])),
+                    rep(4,abs(slope_start_ind1[4]-slope_end_ind1[4])),
+                    rep(0,abs(slope_end_ind1[4]-slope_start_ind1[5])),
+                    rep(5,abs(slope_start_ind1[5]-slope_end_ind1[5])),
+                    rep(0,abs(slope_end_ind1[5]-slope_start_ind1[6])),
+                    rep(6,abs(slope_start_ind1[6]-slope_end_ind1[6])),
+                    rep(0,abs(slope_end_ind1[6]-nrow(result1))+1)
+)
+
+# System 2 (repeat clicking as with system 1)
+plot(result2$date.time,result2$CO2.ppm.cal)
+## *** PLEASE NOTE that the function identify() below will only work if you execute the "plot" command above from the command line
+slope_start_ind2 <- identify(result2$date.time,result2$CO2.ppm.cal)
+plot(result2$date.time,result2$CO2.ppm.cal)
+## *** PLEASE NOTE that the function identify() below will only work if you execute the "plot" command above from the command line
+slope_end_ind2 <- identify(result2$date.time,result2$CO2.ppm.cal)
+
+result2$sample <- c(rep(0,slope_start_ind2[1]-1),
+                    rep(7,abs(slope_start_ind2[1]-slope_end_ind2[1])),
+                    rep(0,abs(slope_end_ind2[1]-slope_start_ind2[2])),
+                    rep(8,abs(slope_start_ind2[2]-slope_end_ind2[2])),
+                    rep(0,abs(slope_end_ind2[2]-slope_start_ind2[3])),
+                    rep(9,abs(slope_start_ind2[3]-slope_end_ind2[3])),
+                    rep(0,abs(slope_end_ind2[3]-slope_start_ind2[4])),
+                    rep(10,abs(slope_start_ind2[4]-slope_end_ind2[4])),
+                    rep(0,abs(slope_end_ind2[4]-slope_start_ind2[5])),
+                    rep(11,abs(slope_start_ind2[5]-slope_end_ind2[5])),
+                    rep(0,abs(slope_end_ind2[5]-slope_start_ind2[6])),
+                    rep(12,abs(slope_start_ind2[6]-slope_end_ind2[6])),
+                    rep(0,abs(slope_end_ind2[6]-nrow(result2))+1)
+)
+
+result1$system <- "system1"
+result2$system <- "system2"
+
+full <- rbind(result1,result2)
+full <- full[-which(full$sample == 0),]
+
+plot(full$CO2.ppm.cal)
+plot(full$RH.pct)
+
+#add sample location to the data.frame
+full$Location <- ifelse(full$sample %in% c(1,2,6),"grass.bare",
+                        ifelse(full$sample %in% c(3,4,5),"grass.live",
+                               ifelse(full$sample %in% c(7,8,9),"meadow","raised.bed"
+                               )
+                        )
+)
+
+full <- full[,-3]
+
+getwd() #this is where your file will be stored unless otherwise indicated
+write_csv(full,paste0(getwd(),"/ENVR_420_18_co2f.csv"))
+```
+
+# 3. Calculation of fluxes
+Calculate soil CO2 fluxes in units of micromoles CO2 per m2 per sec based on ppm CO2 data collected using the UBC Biometeorology soil respiration measurment system
+```{r calculate fluxes}
+library(lubridate) #load the package "lubridate" - make sure that it is installed on your computer 
+library(tidyverse) #load the package "tidyverse" - make sure that it is installed on your computer
+
+# Load the file containing data, as saved from the preceding chunks, or by uncommenting the following line to read in from website
+#CO2.all <- read.csv(paste0(getwd(),"/ENVR_420_18_co2f.csv"))
+CO2.all <- read.csv("https://raw.githubusercontent.com/yeonukkim/ENVR420_2018/master/soilco2_lab/ENVR_420_18_co2f.csv")
+
+
+# fix date string
+class(CO2.all$Date) #check which class variable "Date" is
+CO2.all$Date <- as.Date(CO2.all$Date,"%Y-%m-%d") #convert variable "Date" into class "Date"
+class(CO2.all$Date) #check which class variable "Date" is now
+?paste # see what the command "paste" does
+CO2.all$date.time <- paste(CO2.all$Date,CO2.all$Time) # paste is used to join fields
+class(CO2.all$date.time) #check which class variable "date.time" is
+?ymd_hms
+CO2.all$date.time <- ymd_hms(CO2.all$date.time) 
+class(CO2.all$date.time) #check which class variable "date.time" is now
+
+# change location and sampe class to factor
+# factor class is useful for grouping the dataset.
+class(CO2.all$sample) # this one looks to be of the classs integer
+summary(CO2.all$sample)
+class(CO2.all$Location) # this one looks factor (i.e. categorical)
+class(CO2.all$system)
+CO2.all$sample <- as.factor(CO2.all$sample) # convert sample numbers to factors
+summary(CO2.all$sample) 
+
+# Plot data for initial examination
+ggplot(CO2.all, aes(x = date.time, y = CO2.ppm.cal, colour = Location)) + geom_point() # slopes for CO2
+ggplot(CO2.all, aes(x = date.time, y = CO2.ppm.cal, colour = sample)) + geom_point() + facet_wrap(~Location)
+
+ggplot(CO2.all, aes(x = date.time, y = CO2.ppm.cal, colour = system)) + geom_point() # plotting slopes grouped by system
+ggplot(CO2.all, aes(x = date.time, y = RH.pct, colour = system)) + geom_point() # plotting relative humidity data during measurement periods
+ggplot(CO2.all, aes(x = date.time, y = chamber.temp.degC, colour = system)) + geom_point() # plotting chamber temperature during measurement periods
+
+##################### basic linear flux calculation output CO2 flux in units of micromole per m2 per second 
+### function to calculate co2 flux (regression method)
+
+co2flux <- function(co2,airT,rH){
+
+	# only use First 50 seconds
+	CO2_tmp <- co2[1:50]
+	Air_T_tmp <- mean(airT[1:50]);
+	H2O_tmp <- rH[1:50] # relative humidity (%)
+
+	# define parameters
+	Pbar_tmp <- 101;  # Atmospheric pressure in kPa
+	Pbar <- Pbar_tmp * 1000; # Atmospheric pressure in Pa
+	Vol  <- 0.0014;  # volume of chamber (in m3)
+	Sur  <- 0.0079;  # surface area of chamber (in m2)
+	R <- 8.3144; # Universal Gas Constant in J mol-1 K-1 (or J Kg-1 K-1)
+
+	# convert to mixing ratios
+	H2O_p <- H2O_tmp*(0.61365*exp((17.502*Air_T_tmp)/(240.97+Air_T_tmp)))/100 #kPa of partial pressure of water vapour
+	H2O_mole_fraction <- H2O_p/Pbar_tmp                       # mol/mol wet air
+	H2O_mix_ratio <- H2O_mole_fraction/(1-H2O_mole_fraction) # mol H2O/mol dry air
+	
+	CO2_mix_ratio <- CO2_tmp/(1-H2O_mole_fraction) # "mixing ratio" is what we think of as "ppm". Here, this refers to the effective concentraiton of CO2 expressed on a dry air basis. 
+
+	#creating x to be time in seconds
+	time_s <- 1:length(CO2_tmp)
+	
+	#fit linear midel
+	lm.r <- lm(CO2_mix_ratio ~ time_s)
+	
+	#slope of linear model fit
+	dcdt_tmp <- lm.r$coefficients[2] #extract the slope from the regression relationship
+	
+	rho <- Pbar/ (R * (Air_T_tmp + 273.15));  # mol/m3 ( P is in Pa) from universal gas law
+	
+	flux <- rho * Vol / Sur * dcdt_tmp/(1 + mean(H2O_mix_ratio));
+	
+	return(flux)
+}
+
+# apply the fuction to the dataset
+#soil.flux is the soil respiration in micromol CO2 per square meter per second
+result <- CO2.all %>% 
+							group_by(sample, Location) %>%
+							summarise(soil.flux = co2flux(CO2.ppm.cal,chamber.temp.degC,RH.pct)
+							          )
+
+result
+boxplot(soil.flux ~ Location, data = result)
+ggplot(result, aes(x=Location, y=soil.flux, colour = Location)) + geom_boxplot() #this is how to do a boxplot in ggplot
+ggplot(result, aes(x=Location, y=soil.flux)) + geom_boxplot()
+
+# import ancillary data (e.g. the measurements of soil moisture, soil temperature, and soil electrical conductivity (EC))
+soilData <- read.csv("https://raw.githubusercontent.com/yeonukkim/ENVR420_2018/master/soilco2_lab/soil_condition.csv", header = TRUE)
+colnames(soilData) <- c("Location", "sample", "Replicate", "soil_moisture_cm3_cm3","soil_temp_degC", "soil_EC_dS_m")
+
+soilSummary <- soilData %>% 
+                group_by(sample, Location) %>%
+                summarize(
+                  mean.soil_moisture_cm3_cm3 = mean(soil_moisture_cm3_cm3),
+                  mean.soil_temp_degC = mean(soil_temp_degC),
+                  mean.soil_EC_dS_m = mean(soil_EC_dS_m)
+                         )
+# You can add additional terms to the soilSummary, such as using sd() or other functions. Be sure to have a comma after each line, but not after the last one. 
+
+fullResults <- merge(result,soilSummary) # this line of code merges the two data.frames, which works since both have a column named "sample" with unique information for each "sample"
+fullResults <- fullResults[order(fullResults$Location),] # this line reorders the data.frame to sort it by location
+fullResults
+```
+
+
+# 4. Assignment: Explore soil respiration data. Use creative comparisons and critical thinking!
+
+## Please submit a document with addressing the following as short answers (items 1-3), followed by lab report (items 4-8): 
+1. What is the original CO2 to mV relationship equation programmed into the data logger? Express as equations, both y = x, and as CO2 = mV, adding in the coefficients for slope and intercept. 
+[determine from information provided in lab preamble, noting that from the data logger's perspective, mV is "known", and CO2 is "unknown"]
+2. What should the data logger store as values for each system if the IRGAs were running in a crowded room with actual CO2 concentrations of 550 ppm?
+Please report values for mV, CO2.ppm and CO2.ppm.cal for each of system 1 and system 2
+3. Provide an equation that describes the flux calculation. Make sure that units balance, and that the equation resolves to units of micromoles CO2 per m2 per second. The code from the function "co2flux" might be of help. Be sure to state assumptions that would be needed to adapt the data obtained in our measurements to the equation you provide.
+4. Brief description of the experiment/lab
+5. Two testable hypotheses that can be explored using the data available. 
+6. A summary table of results indicating mean ± sd for each sample location for each parameter (fCO2, VMC, EC, and soil temperature)
+7. Evaluation of your hypotheses, expressed in words and with statistical test results (e.g. p-values)
+8. Interpretation of your findings. For example, what is the relationship between the fluxes found and the ancillary data collected? Think about what the literature indicates the relationships should be between fCO2 and soil soil moisture, as well as fCO2 and soil temperature? Which one was likely more important? What other factors influences fCO2?  
+
+*Submit a separate file* with your `R` code. This can be a .R file (R Script) or a .Rmd file (R Notebook). 
+
+-Notes on approach: In this lab, you can work from the final data.frame (fullResults). Statistical comparisons can be performed by running t-tests or ANOVAs by modifying the code that you used on the water quality lab. 
+-For questions 1 and 2, please work with the script "ENVR 420,Soil CO2 script,Part1.R"
+-For question 3, please refer to the co2flux function found in the script "ENVR 420,Soil CO2 script,Part3.R""
+-If you are interested in reprocessing the flux data, you can do so using the script "ENVR 420,Soil CO2 script,Part2.R""
+ 
+-Optional stretching goal: What would you suggest to correct for the RH data? What would you adjust and how? State your assumptions. How much would the fluxes vary based on corrected RH vs. uncorrected RH?
