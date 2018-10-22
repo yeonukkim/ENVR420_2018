@@ -1,0 +1,57 @@
+---
+title: "Salt gauging problem set"
+output: html_notebook
+---
+
+In this problem set, we will read in conductivity measurements related to salt additions to a stream in the UBC Malcolm Knapp Research Forest. 
+
+#Field procedure: 
+  1. Set data logger to record data every 5 seconds
+  2. Add 100g salt to stream
+  3. Record the salt pulse passing by the electrical conductivity sensor (Decagon Devices GS3 sensor)
+  4. Record depth of streamflow at time of salt addition
+
+#Lab excercise:
+  1. Load depth readings, and salt pulse files (EC = electrical conductivity)
+  2. Compute discharge individually for each salt pulse file (e.g. salt injection) using conservation of mass principles
+  3. Construct a rating curve for the stream based on a series of streamflow measurements with corresponding depths. Here, we plot the known values (depth) on the x-axis against the parameter we are trying to predict (streamflow) on the y-axis. 
+
+
+```{r}
+file.list <- c("saltinject_jan23_1.csv","saltinject_march13_1.csv","saltinject_mar22_1.csv","saltinject_apr3_1.csv","saltinject_april20_2.csv","saltinject_april21_1.csv","saltinject_april28_1.csv","saltinject_may16_1.csv")
+depth.file <- c("date_depth.csv")
+depths <- read.csv(paste0("http://ecohydro.ires.ubc.ca/pdfs/salt_gauging/",depth.file))
+
+salt1 <- read.csv(paste0("http://ecohydro.ires.ubc.ca/pdfs/salt_gauging/",file.list[1]))
+plot(salt1$EC, ylim = c(0,max(salt1$EC)))
+
+salt1$EC.adj <- salt1$EC - min(salt1$EC) # ECt - EC.0 like in Hudson paper
+
+points(salt1$EC.adj, col = "blue")
+
+CF <- 0.486 # From Richardson et al., 2017, units = [mg/L] / [μS/cm]
+# ct =(ECt -EC0)×CF (3) [From Hudson]
+
+salt1$Ct <- salt1$EC.adj * CF
+
+# to repeat for other salt measurements, just adjust the file.list[i] to read in the file, as:
+salt2 <- read.csv(paste0("http://ecohydro.ires.ubc.ca/pdfs/salt_gauging/",file.list[2]))
+```
+
+Note: Electrical conductivity (EC) here is specific conductance (e.g. temperature-corrected electrical conductivity), with units of [μS cm-1 (micro-siemens per cm)]
+
+Calibration factor to conver from EC to salt concentration: 
+0.486 mg·cm·μS-1·L-1 is the relationship between salt mass and specific conductance (see Richardson et al., 2017 in dropbox folder for assignment). Note units: mg·cm·μS-1·L-1 = [mg/L] / [μS/cm] 
+
+```{r}
+t.int <- 5 # 5 seconds per reading
+mass.salt <- 100 # grams of salt added for each salt injection
+A1 <- sum(salt1$Ct)*t.int/1000
+Q1 <- mass.salt/A1
+```
+
+# Assignment: Please submit a brief description of the approach and findings, including:
+1. Discharge (Q) in L s-1 for the eight salt tracer additions
+2. stage-discharge relationship in equation form (e.g. a rating curve equation), where stage = depth in mm
+3. Bonus: Describe uncertainty of Q measurements
+
