@@ -55,3 +55,38 @@ Q1 <- mass.salt/A1
 2. stage-discharge relationship in equation form (e.g. a rating curve equation), where stage = depth in mm
 3. Bonus: Describe uncertainty of Q measurements
 
+
+```{r}
+file.list <- c("saltinject_jan23_1.csv","saltinject_march13_1.csv","saltinject_mar22_1.csv","saltinject_apr3_1.csv","saltinject_april20_2.csv","saltinject_april21_1.csv","saltinject_april28_1.csv","saltinject_may16_1.csv")
+depth.file <- c("date_depth.csv")
+depths <- read.csv(paste0("http://ecohydro.ires.ubc.ca/pdfs/salt_gauging/",depth.file))
+
+depths <- data.frame(depths,Q=rep(NA,nrow(depths)))
+
+
+for (i in c(1:length(file.list))){
+	salt_temp <- read.csv(paste0("http://ecohydro.ires.ubc.ca/pdfs/salt_gauging/",file.list[i]))
+  plot(salt_temp$EC, ylim = c(0,max(salt_temp$EC)))
+
+  salt_temp$EC.adj <- salt_temp$EC - min(salt_temp$EC) # ECt - EC.0 like in Hudson paper
+	points(salt_temp$EC.adj, col = "blue")
+  CF <- 0.486 # From Richardson et al., 2017, units = [mg/L] / [μS/cm]  
+  # ct =(ECt -EC0)×CF (3) [From Hudson]
+  salt_temp$Ct <- salt_temp$EC.adj * CF
+  
+  t.int <- 5 # 5 seconds per reading
+  mass.salt <- 100 # grams of salt added for each salt injection
+  A1 <- sum(salt_temp$Ct)*t.int/1000
+  Q1 <- mass.salt/A1
+
+	depths$Q[i] <- Q1
+	
+}
+
+library(tidyverse)
+depths %>% ggplot(aes(x = depth,y=Q)) + geom_point(aes(colour = `ï..date`)) + geom_smooth(method = lm)
+
+
+
+```
+
