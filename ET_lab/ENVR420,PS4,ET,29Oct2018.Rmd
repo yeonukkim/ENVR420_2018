@@ -1,0 +1,105 @@
+---
+title: "ENVR 420 ET Notebook"
+output: html_notebook
+---
+
+#ET problem set
+
+#Step 1. Import and wrangle data
+```{r}
+# Step 1: read data from .csv file
+# 1.1: Set up data path
+link <- url("http://ecohydro.ires.ubc.ca/pdfs/ET.data.ENVR420.csv")
+
+# 1.2: Import data into a data.frame
+CRdata <- read.csv(link)
+
+# 1.2.2: Explaination of variables in CRdata data.frame
+# ** time step is hourly **
+# date.time.GMT   = time stamp in GMT timezone (e.g. not Vancouver time)
+# Q.L.s           = discharge in liters per second
+# Ta.degC         = Air temperature in degrees C
+# ET.tower.mm     = Evapotranspiration as measured for eddy covariance flux tower footprint in mm
+# ppt.mm          = precipitation in mm
+# GW.plat.mm      = groundwater level at plateau in mm above arbitrary datum
+
+# key constants:
+WSarea <- 911148  # in m^2   
+Sy <- 0.36        # Sy is specific yield, sometimes expressed as a percentage (e.g. 36%)
+Lat.CR <- 49.871  # Latitude of the catchment in decimal degrees
+AlbedoCR <- 0.09    # Albedo value for study area during July 2010 
+AspectCR <- 0
+SlopeCR <- 0
+# TerrestEmiss -- use default value (0.97)
+# PTconstant -- use default value (1.26)
+
+# 1.3: Fix timestamp column into class(POSIXct)
+CRdata$date.time.GMT <- as.POSIXct(strptime(CRdata$date.time.GMT,format ="%m/%d/%y  %H:%M", tz="GMT"))
+
+# 1.3.2 Create a variable for the day of year, here as julian day (eg. "jday")
+CRdata$jday <- as.numeric(format(CRdata$date.time.GMT,"%j"))
+```
+
+# Step 2. Explore data
+```{r}
+# 2.1: have a look at how the data is structured, ensuring that it imported properly
+head(CRdata)
+tail(CRdata)
+
+# 2.2: look at the overall structure of the data
+summary(CRdata) #this will give a summary of each variable in the data.frame
+```
+
+# Amplifying your R skills with dplyr
+The package "dplyr" provides some nice functionality for deriving information from groups of data. 
+Below is an example of how to determine daily mean air temperature for this dataset 
+**- note that you must have the package "dplyr" installed for this to work - use the next line if you need to install the package via `install.packages(dplyr)`, or use the GUI button [Packages > Install] over in the bottom right panel of Rstudio 
+
+# Example with dplyr:
+Compute summary stats for parameter `Ta.deg` from the data.frame `CRdata` for each unique `jday`, and store results in a new data.frame
+
+The function `summarize` will take information contained in one `data.frame` and derive a new `data.frame` based on stats requested. By using `group_by` prior to `summarize`, you will be able to compute statistics for each unique value of the parameter indicated. See also https://datacarpentry.org/R-genomics/04-dplyr.html
+
+```{r}
+library(dplyr)
+?summarize
+Ta.daily <- CRdata %>% 
+              group_by(jday) %>%
+              summarize(
+                N    = length(Ta.degC),
+                mean = mean(Ta.degC),
+                sd   = sd(Ta.degC),
+                se   = sd / sqrt(N) )
+
+towerET <- CRdata %>% 
+              group_by(jday) %>%
+              summarize(
+                 ET.daily = sum(ET.tower.mm.h))
+
+#print the new data.frame to the screen
+Ta.daily
+towerET
+```
+
+# Assignment:
+
+### Working with the supplied hourly dataset, compute the following:
+
+#### 1. Calculate daily ET using the method of Boronina et al. (2005). [Gribovszki et al. (2010) Eqn 2]
+#### 2. Calculate daily ET using the method of Schilling (2007). [Gribovszki et al. (2010) Eqn 5]
+#### 3. Calculate daily PET using EcoHydRology [R package]. Note: Install package and use the function "PET_fromTemp"
+#### 4. Compare these against daily ET from eddy covariance [provided as hourly data]
+
+### --For your write up, you will have estimates of ET for the 14 days as determined by 
+
+#### (i) streamflow
+#### (ii) groundwater
+#### (iii) eddy correlation (tower), and
+#### (iv) estimate of PET (not ET)
+
+### You will need to compare these estimates as we have compared other types of measurements. That is, you will want to compute means and SDs for each estimator, and compare them using statistics
+
+### For this assignment, please submit as a brief report. See assignment document and rubric. 
+
+
+
